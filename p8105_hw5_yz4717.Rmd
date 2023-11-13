@@ -1,0 +1,63 @@
+---
+title: "p8105_hw5_yz4717"
+author: "Yang Zhao - yz4717"
+date: "2023-11-12"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+
+```{r q2_import, message=FALSE}
+
+q2_filenames = 
+  list.files(path = "data",pattern = ".csv")
+
+q2_path = file.path("data",q2_filenames)
+combined_data = NULL
+
+dataq2 = tibble(
+  source = q2_filenames,
+  tibble = map(q2_path, read_csv)
+) |> 
+  unnest(tibble) |> 
+  mutate(source = str_replace(source,".csv","")) |> 
+  separate(source, into = c("control_arm","subject_id"), sep = "_")
+
+```
+
+```{r q2_cleaned}
+dataq2 |> 
+  pivot_longer(
+    week_1:week_8,
+    names_to = "week",
+    values_to = "value"
+  ) |> 
+  mutate(week = str_replace(week,"week_",""))|> 
+  ggplot(aes(x = week, y = value,color = subject_id))+
+  geom_point()+
+  geom_line()+
+  labs(title = " Spaghetti Plot ",
+       x = "Week",
+       y = "Value",
+       color = "Group")+
+  facet_grid(control_arm~.)
+  
+```
+
+```{r q3}
+mu = 0
+sigma = 5
+observations = 30
+num_datasets = 5000
+
+
+test = rnorm(n = observations,
+             mean = mu,
+             sd = sigma)
+
+```
+
