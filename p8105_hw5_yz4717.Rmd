@@ -2,7 +2,9 @@
 title: "p8105_hw5_yz4717"
 author: "Yang Zhao - yz4717"
 date: "2023-11-12"
-output: html_document
+output: 
+  html_document:
+    toc: TRUE
 ---
 
 ```{r}
@@ -10,6 +12,7 @@ library(tidyverse)
 library(ggplot2)
 ```
 
+## Question 2
 
 ```{r q2_import, message=FALSE}
 
@@ -19,34 +22,42 @@ q2_filenames =
 q2_path = file.path("data",q2_filenames)
 combined_data = NULL
 
-dataq2 = tibble(
+data_q2 = tibble(
   source = q2_filenames,
   tibble = map(q2_path, read_csv)
 ) |> 
   unnest(tibble) |> 
   mutate(source = str_replace(source,".csv","")) |> 
-  separate(source, into = c("control_arm","subject_id"), sep = "_")
+  separate(source, into = c("arm","subject_id"), sep = "_") |> 
+  relocate(arm,subject_id)
 
 ```
 
 ```{r q2_cleaned}
-dataq2 |> 
+data_q2 |> 
   pivot_longer(
     week_1:week_8,
     names_to = "week",
     values_to = "value"
   ) |> 
-  mutate(week = str_replace(week,"week_",""))|> 
-  ggplot(aes(x = week, y = value,color = subject_id))+
+  mutate(week = str_replace(week,"week_",""),
+         arm = case_match(arm,
+                          "con" ~ "control",
+                          "exp" ~ "experiment"))|> 
+  ggplot(aes(x = week, y = value,
+             group = subject_id, 
+             color = subject_id))+
   geom_point()+
   geom_line()+
   labs(title = " Spaghetti Plot ",
        x = "Week",
        y = "Value",
        color = "Group")+
-  facet_grid(control_arm~.)
+  facet_grid(arm~.)
   
 ```
+
+## Question 3
 
 ```{r q3}
 mu = 0
@@ -54,10 +65,38 @@ sigma = 5
 observations = 30
 num_datasets = 5000
 
+normtest = function(observations = 30,mu = 0,sigma = 5){
+  sample = rnorm(n=observations,mean = mu,sd = sigma)
+  result = t.test(sample,alternative = "two.sided",conf.level = .95) |> 
+    broom::tidy() |> 
+    select(estimate,p.value)
+  return(result)
+}
 
-test = rnorm(n = observations,
-             mean = mu,
-             sd = sigma)
+test_result = data_frame()
+final_result = list(length = 7)
+
+for (a in 0:6) {
+  test_result = NULL
+  for(i in 1:num_datasets){
+  test_result = rbind(test_result,normtest(mu = a))
+  }
+  final_result[[a+1]] = test_result
+}
+
+power = as.vector(map(final_result, \(x) sum(x$p.value<.05)/5000) |> 
+  unlist())
+power_eff = tibble(power,effect_size = c(0:6))
+
+power_eff |>
+  ggplot(aes(x = effect_size, y = power)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Effect Size & Power",
+       x = "Effect Size",
+       y = "Power")
+
+
 
 ```
 
