@@ -10,7 +10,92 @@ output:
 ```{r}
 library(tidyverse)
 library(ggplot2)
+
+set.seed(1)
 ```
+
+# Problem 1
+
+```{r}
+homicide_data_raw = read_csv("homicide-data.csv")
+```
+
+The raw data consist `r ncol(homicide_data_raw)` variables and `r nrow(homicide_data_raw)` observations. Each observation includes uid, reported date, victim first and last name, race, age, sex, city, state, lat, lon, and disposition.
+
+```{r}
+homicide_data = 
+homicide_data_raw |>
+  mutate(city_state = paste(city, state, sep=", "),
+         disposition = case_match(
+           disposition,
+           "Closed by arrest" ~ "homicides",
+           "Closed without arrest" ~ "unsolved homicides",
+           "Open/No arrest" ~ "unsolved homicides"
+         )) |>
+  group_by(city_state, disposition) |>
+  summarize(n = n()) |>
+  filter(city_state != "Tulsa, AL") 
+```
+
+Tulsa, AL in city_state is removed, as it is not a major US city.
+
+```{r}
+# prop.test
+homicide_data_Bal = homicide_data |>
+  pivot_wider(
+    names_from = "disposition", 
+    values_from = "n") |>
+  filter(city_state == "Baltimore, MD")
+
+prop_test_Bal = 
+  prop.test(pull(homicide_data_Bal, `unsolved homicides`), 
+            pull(homicide_data_Bal, homicides) + pull(homicide_data_Bal,`unsolved homicides`))
+
+prop_test_Bal |>
+  broom::tidy() |>
+  select(estimate, conf.low, conf.high)
+```
+
+```{r}
+# prop.test for each city
+homicide_data_prop = homicide_data |>
+  pivot_wider(
+    names_from = "disposition", 
+    values_from = "n") |>
+    filter(city_state != "Tulsa, AL") 
+
+prop_test_city_state = function(a) {
+    x = homicide_data_prop |>
+      filter(city_state == a)
+    
+    test = prop.test(pull(x, `unsolved homicides`),
+                     pull(x, homicides) + pull(x,`unsolved homicides`))
+    test_result = test |>
+      broom::tidy() |>
+      select(estimate, conf.low, conf.high)
+    
+    test_result
+}
+
+test_res  = 
+  data.frame(city_state = unique(pull(homicide_data_prop, city_state))) |>
+  mutate(prop_test_res = purrr::map(city_state,prop_test_city_state)) |>
+  unnest(cols = c(prop_test_res))
+```
+
+
+plot of the estimates and CIs for each city
+
+```{r}
+test_res |>
+  mutate(city_state = fct_reorder(city_state, estimate)) |>
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+The plot arrange the estimate of the proportion of unsolved homicides in city,state. Chicago has the highest estimate and small range of confidence interval.
 
 ## Question 2
 
@@ -59,7 +144,7 @@ data_q2 |>
 
 ## Question 3
 
-```{r q3}
+```{r q3_function}
 mu = 0
 sigma = 5
 observations = 30
@@ -73,6 +158,10 @@ normtest = function(observations = 30,mu = 0,sigma = 5){
   return(result)
 }
 
+```
+
+
+```{r q3_power_plot}
 test_result = data_frame()
 final_result = list(length = 7)
 
@@ -84,7 +173,8 @@ for (a in 0:6) {
   final_result[[a+1]] = test_result
 }
 
-power = as.vector(map(final_result, \(x) sum(x$p.value<.05)/5000) |> 
+power = as.vector(
+  map(final_result, \(x) sum(x$p.value<.05)/5000) |> 
   unlist())
 power_eff = tibble(power,effect_size = c(0:6))
 
@@ -94,9 +184,61 @@ power_eff |>
   geom_line() +
   labs(title = "Effect Size & Power",
        x = "Effect Size",
-       y = "Power")
+       y = "Power") + 
+  theme_minimal()
+
+```
+
+```{r}
+
+mean_est = 
+  as.vector(
+  map(final_result,\(x) mean(x$estimate)) |> 
+    unlist()
+)
+
+ave_and_true = 
+  data.frame(mean_est,mu = 0:6)
+
+ave_and_true |>
+  ggplot(aes(x = mu,
+             y = mean_est)) +
+  geom_point(color = "yellow") +
+  geom_line(color = "yellow") +
+  labs(title = "Average Estimate & True Mean",
+       x = "True Mean",
+       y = "Average Estimate") 
+
+```
 
 
+```{r}
+reject_true = lapply(final_result,function(df){
+   filtered = df |> 
+     filter(df$p.value<.05)
+   return(mean(filtered$estimate))
+}) |> 
+  unlist()
+  
+rej_true_df = 
+  data.frame(reject_true,
+             true_mean = 0:6)
 
+ggplot() +
+  geom_point(data = ave_and_true,
+             aes(x = mu, y = mean_est),
+             color = "red") +
+  geom_line(data = ave_and_true,
+            aes(x = mu, y = mean_est),
+            color = "red") +
+  geom_point(data = rej_true_df,
+             aes(x = true_mean, y = reject_true),
+             color = "blue") +
+  geom_line(data = rej_true_df,
+            aes(x = true_mean, y = reject_true),
+            color = "blue") +
+  labs(title = "Average Estimate vs. True Mean",
+       x = "True Mean",
+       y = "Average Estimate")
 ```
 
