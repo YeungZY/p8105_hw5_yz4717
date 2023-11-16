@@ -14,7 +14,7 @@ library(ggplot2)
 set.seed(1)
 ```
 
-# Problem 1
+# Question 1
 
 ```{r}
 homicide_data_raw = read_csv("homicide-data.csv")
@@ -56,6 +56,7 @@ prop_test_Bal |>
   select(estimate, conf.low, conf.high)
 ```
 
+
 ```{r}
 # prop.test for each city
 homicide_data_prop = homicide_data |>
@@ -83,7 +84,6 @@ test_res  =
   unnest(cols = c(prop_test_res))
 ```
 
-
 plot of the estimates and CIs for each city
 
 ```{r}
@@ -97,7 +97,7 @@ test_res |>
 
 The plot arrange the estimate of the proportion of unsolved homicides in city,state. Chicago has the highest estimate and small range of confidence interval.
 
-## Question 2
+# Question 2
 
 ```{r q2_import, message=FALSE}
 
@@ -117,6 +117,8 @@ data_q2 = tibble(
   relocate(arm,subject_id)
 
 ```
+
+First, I listed all the file names via `list.files` and applied the map function to read all files in the founder. Besides, I added a variable `source` to track the data and made it into a reader friendly table.
 
 ```{r q2_cleaned}
 data_q2 |> 
@@ -138,11 +140,13 @@ data_q2 |>
        x = "Week",
        y = "Value",
        color = "Group")+
-  facet_grid(arm~.)
+  facet_grid(~arm)
   
 ```
 
-## Question 3
+From the shown graph, in the control group, the data show some fluctuations, but on the whole, the data in the control group do not show any obvious upward or downward trend. However, within the experiment group, there is a obvious upward tendency. There is a significant difference between these two.
+
+# Question 3
 
 ```{r q3_function}
 mu = 0
@@ -160,6 +164,9 @@ normtest = function(observations = 30,mu = 0,sigma = 5){
 
 ```
 
+In the question 3, to avoid the redundancy, I wrote the simulation procedure that needed to be repeated, containing data cleaning, into a function called `normtest`. 
+
+The function of `normtest` first generates `r observations` random numbers based on a normal distribution with `mean = 0` and `standard deviation = 5` , followed by a two-sided hypothesis test with a 95% confidence level on the resulting samples. Cleaning and integration of the results is also included in this function.
 
 ```{r q3_power_plot}
 test_result = data_frame()
@@ -182,12 +189,13 @@ power_eff |>
   ggplot(aes(x = effect_size, y = power)) +
   geom_point() +
   geom_line() +
-  labs(title = "Effect Size & Power",
-       x = "Effect Size",
-       y = "Power") + 
-  theme_minimal()
+  labs(title = "Population Mean & Power",
+       x = "Population Mean",
+       y = "Power")
 
 ```
+
+* comment: It is obvious that, as the population mean increasing, power rise rapidly. As the power approaching 1, the slower it grows. 
 
 ```{r}
 
@@ -195,7 +203,7 @@ mean_est =
   as.vector(
   map(final_result,\(x) mean(x$estimate)) |> 
     unlist()
-)
+  )
 
 ave_and_true = 
   data.frame(mean_est,mu = 0:6)
@@ -205,14 +213,15 @@ ave_and_true |>
              y = mean_est)) +
   geom_point(color = "yellow") +
   geom_line(color = "yellow") +
-  labs(title = "Average Estimate & True Mean",
-       x = "True Mean",
+  labs(title = "Average Estimate & Population Mean",
+       x = "Population Mean",
        y = "Average Estimate") 
 
 ```
 
+At the first, we have to draw a line of population mean.
 
-```{r}
+```{r q3_}
 reject_true = lapply(final_result,function(df){
    filtered = df |> 
      filter(df$p.value<.05)
@@ -227,18 +236,19 @@ rej_true_df =
 ggplot() +
   geom_point(data = ave_and_true,
              aes(x = mu, y = mean_est),
-             color = "red") +
+             color = "yellow") +
   geom_line(data = ave_and_true,
             aes(x = mu, y = mean_est),
-            color = "red") +
+            color = "yellow") +
   geom_point(data = rej_true_df,
              aes(x = true_mean, y = reject_true),
              color = "blue") +
   geom_line(data = rej_true_df,
             aes(x = true_mean, y = reject_true),
             color = "blue") +
-  labs(title = "Average Estimate vs. True Mean",
-       x = "True Mean",
+  labs(title = "Average Estimate & Population Mean",
+       x = "Population Mean",
        y = "Average Estimate")
 ```
 
+* Comment: The yellow line represents the average estimate compared to the population mean, indicating a close alignment between the two. On the other hand, the blue line depicts the average estimate when the null hypothesis is rejected versus the population mean. Notably, for null rejections corresponding to mean values of 0, 1, 2, 3, 4, 5 and 6, the sample average does not closely approximate the population mean. This discrepancy is attributed to insufficient statistical power. The sample average estimate converges with the mean as statistical power or effect size increases.
